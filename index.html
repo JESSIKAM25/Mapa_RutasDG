@@ -1,0 +1,97 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Rutas Conductor</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    body, html { margin: 0; padding: 0; height: 100%; }
+    #map { height: 100%; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map').setView([-0.22985, -78.52495], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    const sheetURL = 'https://opensheet.vercel.app/1AMJ_afjdWv_B38czZE-cvAklNuDpboY959VYIHQPj-s/Hoja%201';
+    const coloresTransportistas = {
+     "BYRON PINTO": "red",
+     "UFREDO PINOS": "blue",
+     "LUIS YUGSAN": "purple",
+     "NELSON GOMEZ": "green",
+     "TRAMACO": "orange",
+     "BRYAN PERDOMO": "brown",
+     "HERNAN PALMA": "magenta",
+     "TRANS ESMERALDAS": "teal",
+     "TRANSPORTES LOJA": "gold",
+     "ENETSA": "navy",
+     "TRANSDYR": "darkgreen",
+     "SERVIQUITO": "black",
+     "RETIRO DE BODEGA": "gray"
+    };
+
+    fetch(sheetURL)
+      .then(res => res.json())
+      .then(data => {console.log("Datos cargados:", data);
+
+        const rutas = {};
+        data.forEach(fila => {
+         // FILTRO 1: existe la coordenada
+         if (!fila["coordenadas geo"]) return;
+
+         // FILTRO 2: No contiene texto de error
+         const coordTexto = fila["coordenadas geo"].toLowerCase();
+         if (
+         coordTexto.includes("error") ||
+         coordTexto.includes("geocodificar") ||
+         coordTexto.includes("n/a") ||
+          coordTexto.trim() === ""
+         ) return;
+
+         // FILTRO 3: formato válido (debe tener una coma)
+         if (!coordTexto.includes(',')) return;
+          const [lat, lng] = coordTexto.split(',').map(s => parseFloat(s.trim()));
+
+         // FILTRO 4: los dos valores son números válidos
+          if (isNaN(lat) || isNaN(lng)) return;
+
+         // FILTRO 5: existen fecha y transportista
+         if (!fila["fechayhoraGPS"] || !fila["transportista"]) return;
+
+         // Si pasa todos los filtros, agrega la ruta
+         const transportista = fila["transportista"];
+         const hora = new Date(fila["columna ISO"]);
+         if (!rutas[transportista]) rutas[transportista] = [];
+         rutas[transportista].push({ lat, lng, hora, fila });
+        });
+
+        Object.entries(rutas).forEach(([nombre, puntos], i) => {
+          puntos.sort((a, b) => a.hora - b.hora);
+          const coords = puntos.map(p => [p.lat, p.lng]);
+          if (coords.length > 1) {
+         L.polyline(coords, { color: coloresTransportistas[nombre] || 'gray', weight: 4 }).addTo(map)
+         .bindPopup(`Ruta de ${nombre}`);
+}
+          puntos.forEach(p => {
+            L.marker([p.lat, p.lng]).addTo(map)
+              .bindPopup(`<b>${nombre}</b><br>${p.hora.toLocaleString()}`);
+          });
+        });
+      })
+      .catch(err => console.error('Error cargando datos:', err));
+      // Refrescar cada 15 minutos (900000 milisegundos)
+setInterval(() => {
+  location.reload();
+}, 900000); // 15 minutos
+
+  </script>
+</body>
+</html>
